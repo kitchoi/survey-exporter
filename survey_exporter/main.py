@@ -61,6 +61,7 @@ def build_survey_responses_html(
         target_path = output_dir / urllib.parse.unquote(media_suffix(url))
         if target_path.exists():
             return
+        print("Downloading media:", url)
         with open(target_path, "wb") as f:
             try:
                 req = urllib.request.Request(url, headers=headers, method="GET")
@@ -152,6 +153,7 @@ def build_survey_responses_html(
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(output_dir / "survey_responses.html", "w", encoding="utf-8") as f:
         f.write(full_html)
+    print("Done. Output written to survey_responses.html")
 
     
 

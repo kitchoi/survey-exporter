@@ -12,8 +12,8 @@ class SurveyExporterGUI:
         root.title("Survey Exporter")
         
         # API Key
-        tk.Label(root, text="API Key:").pack(pady=5)
-        self.api_key = tk.Entry(root, width=50)
+        tk.Label(root, text="Password:").pack(pady=5)
+        self.api_key = tk.Entry(root, width=50, show="*")
         self.api_key.pack(pady=5)
         
         # Output Directory

@@ -24,13 +24,34 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Build executable
+    - name: Build executable with PyInstaller
       run: |
         pyinstaller survey_exporter.spec
-        
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+
+    - name: Zip dist folder
+      shell: powershell
+      run: |
+        if (Test-Path survey_exporter_dist.zip) { Remove-Item survey_exporter_dist.zip -Force }
+        Compress-Archive -Path 'dist\*' -DestinationPath 'survey_exporter_dist.zip' -Force
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: SurveyExporter-Windows
-        path: dist/
-        retention-days: 7
+        tag_name: build-${{ github.run_number }}-${{ github.sha }}
+        release_name: Build ${{ github.run_number }}
+        body: Automated Windows build
+        draft: false
+        prerelease: true
+
+    - name: Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: survey_exporter_dist.zip
+        asset_name: survey_exporter_dist.zip
+        asset_content_type: application/zip

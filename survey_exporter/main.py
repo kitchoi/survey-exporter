@@ -70,8 +70,9 @@ def build_survey_responses_html(
             return json.load(resp)
 
     def http_get_head_or_download(url: str, headers: dict) -> None:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        target_path = output_dir / urllib.parse.unquote(media_suffix(url))
+        media_dir = output_dir / "media"
+        media_dir.mkdir(parents=True, exist_ok=True)
+        target_path = media_dir / urllib.parse.unquote(media_suffix(url))
         if target_path.exists():
             return
         emit(f"Downloading media: {url}")
@@ -142,7 +143,7 @@ def build_survey_responses_html(
             )
         
         def to_link(s: str) -> str:
-            return f'<a href="{s}">{esc(s)}</a>'
+            return f'<a href="media/{s}">{urllib.parse.unquote(s)}</a>'
 
         breaches_str = "<br/>".join(esc(x) for x in entry.breaches)
         media_str = "<br/>".join(to_link(x) for x in entry.media)

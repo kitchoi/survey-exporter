@@ -1,5 +1,7 @@
-from dataclasses import dataclass
 import pathlib
+import queue as _queue
+from dataclasses import dataclass
+from typing import Any, Optional, List
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ def build_survey_responses_html(
     date_id: str = "h6fzgacr725cmapuwzz9ot5h",
     time_id: str = "o45q50hpyzow5xfgk5dr8ey5",
     media_url_id: str = "qu3bazylkalup4hy24q2pb1n",
+    out_queue: Optional[_queue.Queue] = None,
 ) -> str:
     """
     Fetch survey responses from Formbricks Management API and return an HTML table
@@ -51,6 +54,16 @@ def build_survey_responses_html(
     import urllib.parse
     from typing import Any, Optional, List
 
+    def emit(msg: str) -> None:
+        if out_queue is not None:
+            try:
+                out_queue.put(msg)
+            except Exception:
+                # best-effort: fallback to print if queue fails
+                print(msg)
+        else:
+            print(msg)
+
     def http_get_json(url: str, headers: dict) -> Any:
         req = urllib.request.Request(url, headers=headers, method="GET")
         with urllib.request.urlopen(req) as resp:
@@ -61,15 +74,15 @@ def build_survey_responses_html(
         target_path = output_dir / urllib.parse.unquote(media_suffix(url))
         if target_path.exists():
             return
-        print("Downloading media:", url)
+        emit(f"Downloading media: {url}")
         with open(target_path, "wb") as f:
             try:
                 req = urllib.request.Request(url, headers=headers, method="GET")
                 with urllib.request.urlopen(req) as resp:
                     while (chunk := resp.read(8192)):
                         f.write(chunk)
-            except Exception:
-                pass
+            except Exception as e:
+                emit(f"Warning: failed to download {url}: {e}")
 
 
     def get_value(obj: Any, target: str) -> Optional[Any]:
@@ -86,17 +99,20 @@ def build_survey_responses_html(
     try:
         payload = http_get_json(base_url, headers)
     except Exception as e:
+        emit(f"Error fetching responses: {e}")
         # return minimal HTML indicating error
         return f"<html><body><p>Error fetching responses: {str(e)}</p></body></html>"
 
     data = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(data, list):
-        # unexpected shape
+        emit("No response data found or unexpected response shape")
         return "<html><body><p>No response data found</p></body></html>"
 
     rows: List[str] = []
     entries: List[Entry] = []
-    for item in data:
+    for idx, item in enumerate(data, start=1):
+        emit(f"Processing entry {idx}/{len(data)}")
+
         # find breaches (expected list), date (scalar), time (scalar), media (list of urls)
         breaches_val = get_value(item, breaches_id)
         date_val = get_value(item, date_id)
@@ -139,7 +155,6 @@ def build_survey_responses_html(
             "</tr>"
         )
         rows.append(row_html)
-        print("Processed entry:", entry.date, entry.time)
 
     table_html = (
         "<table border='1'>"
@@ -153,9 +168,7 @@ def build_survey_responses_html(
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(output_dir / "survey_responses.html", "w", encoding="utf-8") as f:
         f.write(full_html)
-    print("Done. Output written to survey_responses.html")
-
-    
+    emit("Done. Output written to survey_responses.html")
 
 
 if __name__ == "__main__":

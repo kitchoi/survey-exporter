@@ -1,23 +1,10 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 import pathlib
-import sys
 import queue
 import threading
 from survey_exporter.main import build_survey_responses_html
 
-class StdoutRedirector:
-    def __init__(self, text_widget, queue):
-        self.text_widget = text_widget
-        self.queue = queue
-        self.original_stdout = sys.stdout
-
-    def write(self, text):
-        self.original_stdout.write(text)
-        self.queue.put(text)
-
-    def flush(self):
-        self.original_stdout.flush()
 
 class SurveyExporterGUI:
     def __init__(self, root):
@@ -49,8 +36,6 @@ class SurveyExporterGUI:
 
         # Setup stdout redirection
         self.output_queue = queue.Queue()
-        self.original_stdout = sys.stdout
-        sys.stdout = StdoutRedirector(self.console, self.output_queue)
         
         # Start output monitoring
         self.monitor_output()
@@ -60,7 +45,7 @@ class SurveyExporterGUI:
         while True:
             try:
                 text = self.output_queue.get_nowait()
-                self.console.insert(tk.END, text)
+                self.console.insert(tk.END, text + "\n")
                 self.console.see(tk.END)
                 self.console.update_idletasks()
             except queue.Empty:
@@ -91,25 +76,23 @@ class SurveyExporterGUI:
         # Run export in separate thread to prevent GUI freezing
         def export_thread():
             try:
-                build_survey_responses_html(api_key, pathlib.Path(output_dir))
+                # pass the GUI's queue so build_survey_responses_html emits to the console
+                build_survey_responses_html(api_key, pathlib.Path(output_dir), out_queue=self.output_queue)
                 self.root.after(0, lambda: messagebox.showinfo(
                     "Success", 
                     "Survey exported successfully!\n"
                     f"Check {output_dir} for the results."))
             except Exception as e:
+                raise
                 self.root.after(0, lambda: messagebox.showerror(
                     "Error", f"Failed to export survey:\n{str(e)}"))
 
         threading.Thread(target=export_thread, daemon=True).start()
 
-    def cleanup(self):
-        """Restore original stdout when closing"""
-        sys.stdout = self.original_stdout
 
 def main():
     root = tk.Tk()
     app = SurveyExporterGUI(root)
-    root.protocol("WM_DELETE_WINDOW", lambda: [app.cleanup(), root.destroy()])
     root.mainloop()
 
 if __name__ == "__main__":

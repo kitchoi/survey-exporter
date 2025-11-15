@@ -82,9 +82,10 @@ class SurveyExporterGUI:
                     "Success", 
                     "Survey exported successfully!\n"
                     f"Check {output_dir} for the results."))
-            except Exception as e:
+            except Exception as exception:
+                error_msg = str(exception)
                 self.root.after(0, lambda: messagebox.showerror(
-                    "Error", f"Failed to export survey:\n{str(e)}"))
+                    "Error", f"Failed to export survey:\n{error_msg}"))
 
         threading.Thread(target=export_thread, daemon=True).start()
 

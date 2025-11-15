@@ -78,7 +78,7 @@ def get_entries(
         req = urllib.request.Request(
             url, headers={**headers, "Accept": "application/json"}, method="GET"
         )
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             return json.load(resp)
 
     def get_value(obj: Any, target: str) -> Optional[Any]:

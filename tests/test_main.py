@@ -1,7 +1,12 @@
 import pathlib
 import pytest
 from unittest.mock import patch, MagicMock
-from survey_exporter.main import Entry, build_survey_responses_html, get_entries
+from survey_exporter.main import (
+    Entry,
+    build_survey_responses_html,
+    get_entries,
+    http_get_head_or_download,
+)
 import json
 
 
@@ -343,3 +348,22 @@ def test_build_survey_responses_html_downloads_media(tmp_path):
         html_text = html_path.read_text(encoding="utf-8")
         assert "file1.jpg" in html_text
         assert "doc.pdf" in html_text
+
+
+def test_http_get_head_or_download_cleans_up_on_failure(tmp_path):
+    """Test that http_get_head_or_download removes partial files on download failure."""
+    target_path = tmp_path / "failed_download.pdf"
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_urlopen.side_effect = Exception("network error")
+
+        result = http_get_head_or_download(
+            url="https://example.com/private/file.pdf",
+            headers={"x-api-key": "test_key"},
+            target_path=target_path,
+        )
+
+        # Should return False on failure
+        assert result is False
+        # File should not exist
+        assert not target_path.exists()

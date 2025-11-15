@@ -1,6 +1,6 @@
 import pathlib
 import queue as _queue
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional, List, Dict
 
 
@@ -10,7 +10,7 @@ class Entry:
     date: str
     time: str
     # mapping from cleaned suffix -> original URL
-    media_map: dict[str, str]
+    media_map: dict[str, str] = field(default_factory=dict)
 
 
 def media_suffix(url: str) -> str:
@@ -119,14 +119,12 @@ def get_entries(
         date_str = "" if date_val is None else str(date_val)
         time_str = "" if time_val is None else str(time_val)
 
-        # Clean media URLs using media_suffix and return suffix list and map
-        media_suffixes: list[str] = []
+        # Clean media URLs using media_suffix and build suffix -> URL map
         media_map: Dict[str, str] = {}
         for url in media_val:
             if not isinstance(url, str):
                 continue
             suffix = media_suffix(url)
-            media_suffixes.append(suffix)
             media_map[suffix] = url
 
         # create Entry without media attributes, attach media_map dynamically
@@ -152,8 +150,7 @@ def build_survey_responses_html(
     out_queue: Optional[_queue.Queue] = None,
 ) -> str:
     """
-    Fetch survey responses from Formbricks Management API and return an HTML table
-    as a single string with columns: Breaches, Date, Time, Media.
+    Fetch survey responses from Formbricks Management API and return the path to the generated HTML file.
 
     Media files found at URLs are downloaded (request made with same x-api-key header)
     into output_dir/media/ and only the suffix after 'private/' is retained for the HTML output.
@@ -170,6 +167,9 @@ def build_survey_responses_html(
         else:
             print(msg)
 
+    output_dir.mkdir(parents=True, exist_ok=True)
+    html_path = output_dir / "survey_responses.html"
+
     # obtain entries via get_entries (keeps concerns separated)
     try:
         entries = get_entries(
@@ -182,10 +182,17 @@ def build_survey_responses_html(
         )
     except RuntimeError as e:
         emit(str(e))
-        return f"<html><body><p>Error fetching responses: {e}</p></body></html>"
+        error_html = f"<html><body><p>Error fetching responses: {e}</p></body></html>"
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(error_html)
+        return str(html_path)
+
     if not entries:
         emit("No response data found or unexpected response shape")
-        return "<html><body><p>No response data found</p></body></html>"
+        no_data_html = "<html><body><p>No response data found</p></body></html>"
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(no_data_html)
+        return str(html_path)
 
     # Download media files using media_map if present
     headers = {"x-api-key": api_key}
@@ -213,7 +220,8 @@ def build_survey_responses_html(
             )
 
         def to_link(s: str) -> str:
-            return f'<a href="media/{s}">{urllib.parse.unquote(s)}</a>'
+            escaped_filename = esc(urllib.parse.unquote(s))
+            return f'<a href="media/{esc(s)}">{escaped_filename}</a>'
 
         breaches_str = "<br/>".join(esc(x) for x in entry.breaches)
         media_str = "<br/>".join(to_link(x) for x in entry.media_map)
@@ -234,11 +242,10 @@ def build_survey_responses_html(
     )
     full_html = f"<!doctype html><html><head><meta charset='utf-8'><title>Survey Responses</title></head><body>{table_html}</body></html>"
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with open(output_dir / "survey_responses.html", "w", encoding="utf-8") as f:
+    with open(html_path, "w", encoding="utf-8") as f:
         f.write(full_html)
     emit("Done. Output written to survey_responses.html")
-    return str(output_dir / "survey_responses.html")
+    return str(html_path)
 
 
 if __name__ == "__main__":

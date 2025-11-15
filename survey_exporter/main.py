@@ -125,6 +125,11 @@ def get_entries(
             if not isinstance(url, str):
                 continue
             suffix = media_suffix(url)
+            if suffix in media_map:
+                raise ValueError(
+                    f"Duplicate media suffix '{suffix}': first URL '{media_map[suffix]}', "
+                    f"current URL '{url}'. Please resolve the naming conflict."
+                )
             media_map[suffix] = url
 
         # create Entry without media attributes, attach media_map dynamically

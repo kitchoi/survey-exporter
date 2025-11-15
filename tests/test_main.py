@@ -277,6 +277,49 @@ def test_get_entries_raises_on_http_error():
         assert "Failed to fetch entries" in str(excinfo.value)
 
 
+def test_get_entries_raises_on_duplicate_media_suffix():
+    """Test that get_entries raises ValueError when media URLs produce duplicate suffixes."""
+    response = {
+        "data": [
+            {
+                "data": {
+                    "breach_123": [],
+                    "date_456": "2025-11-15",
+                    "time_789": "14:30",
+                    "media_101": [
+                        "https://example.com/private/document.pdf",
+                        "https://other.com/private/document.pdf",
+                    ],
+                }
+            }
+        ]
+    }
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_response = MagicMock()
+        mock_response.__enter__.return_value.read.return_value = json.dumps(
+            response
+        ).encode()
+        mock_urlopen.return_value = mock_response
+
+        with pytest.raises(ValueError) as excinfo:
+            get_entries(
+                api_key="test_key",
+                survey_id="survey_123",
+                breaches_id="breach_123",
+                date_id="date_456",
+                time_id="time_789",
+                media_url_id="media_101",
+            )
+
+        error_msg = str(excinfo.value)
+        assert "Duplicate media suffix" in error_msg
+        assert "document.pdf" in error_msg
+        assert "https://example.com/private/document.pdf" in error_msg
+        assert "https://other.com/private/document.pdf" in error_msg
+        assert "naming conflict" in error_msg
+
+
 def make_filelike_with_read(content):
     m = MagicMock()
     # json.load expects a text file-like (returning str)

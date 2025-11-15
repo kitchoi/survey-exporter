@@ -36,11 +36,16 @@ jobs:
       run: |
         poetry run ruff format . --check
 
+    - name: Run tests with pytest
+      run: |
+        poetry run pytest -q
+        
     - name: Build executable with PyInstaller
       run: |
         poetry run pyinstaller survey_exporter.spec
 
     - name: Zip dist folder
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       shell: powershell
       run: |
         if (Test-Path survey_exporter_dist.zip) { Remove-Item survey_exporter_dist.zip -Force }

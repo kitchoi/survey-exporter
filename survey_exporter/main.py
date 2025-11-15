@@ -46,7 +46,7 @@ def emit(msg: str) -> None:
 @dataclass(frozen=True)
 class Entry:
     """Represents a single survey response entry.
-    
+
     Attributes:
         breaches: List of breach descriptions reported in the survey response.
         date: Date string associated with the survey response.
@@ -55,6 +55,7 @@ class Entry:
             original URLs. The keys are cleaned filenames extracted via media_suffix(),
             and values are the full original URLs for downloading.
     """
+
     breaches: list[str]
     date: str
     time: str
@@ -64,16 +65,16 @@ class Entry:
 
 def media_suffix(url: str) -> str:
     """Extract a cleaned filename suffix from a media URL.
-    
+
     If the URL contains 'private/', returns everything after that segment.
     Otherwise, returns the last path segment of the URL.
-    
+
     Args:
         url: The media URL to extract the suffix from.
-        
+
     Returns:
         The cleaned filename suffix extracted from the URL.
-        
+
     Examples:
         >>> media_suffix("https://example.com/private/image.jpg")
         "image.jpg"
@@ -93,18 +94,18 @@ def http_get_head_or_download(
     url: str, headers: dict, target_path: pathlib.Path
 ) -> bool:
     """Download a file from a URL to a target path with atomic write semantics.
-    
+
     Creates the target directory if it doesn't exist. Only writes the file if
     the download succeeds. Cleans up any partially written files on failure.
-    
+
     Args:
         url: The URL to download from.
         headers: Dictionary of HTTP headers to include in the request.
         target_path: Path where the downloaded file should be saved.
-        
+
     Returns:
         True if the download succeeded and the file was written, False otherwise.
-        
+
     Note:
         This function implements atomic write semantics - the file is only created
         if the download completes successfully. Any partial files are removed on error.
@@ -139,11 +140,11 @@ def get_entries(
     media_url_id: str,
 ) -> list[Entry]:
     """Fetch survey responses from the Formbricks Management API.
-    
+
     Retrieves survey responses for the specified survey and field IDs, parsing
     each response into an Entry object. For each entry, constructs a media_map
     dictionary mapping cleaned filenames (via media_suffix) to their original URLs.
-    
+
     Args:
         api_key: Formbricks API key for authentication (passed in x-api-key header).
         survey_id: The survey ID to fetch responses from.
@@ -151,11 +152,11 @@ def get_entries(
         date_id: Field ID for the date field in the survey.
         time_id: Field ID for the time field in the survey.
         media_url_id: Field ID for the media URL field in the survey.
-        
+
     Returns:
         List of Entry objects representing the survey responses. Returns an empty
         list if the response data is invalid or not in the expected format.
-        
+
     Raises:
         RuntimeError: If the HTTP request fails or JSON parsing fails, wrapping
             the underlying exception with a "Failed to fetch entries" message.
@@ -247,14 +248,14 @@ def build_survey_responses_html(
     media_url_id: str = "qu3bazylkalup4hy24q2pb1n",
 ) -> str:
     """Build an HTML report of survey responses with downloaded media files.
-    
+
     Fetches survey responses from the Formbricks Management API, downloads all
     associated media files to a local media subdirectory, and generates an HTML
     table displaying the responses with links to the downloaded media.
-    
+
     The function handles errors gracefully by writing minimal error HTML when
     the API request fails or no data is found.
-    
+
     Args:
         api_key: Formbricks API key for authentication.
         output_dir: Directory where the HTML file and media subdirectory will be created.
@@ -263,10 +264,10 @@ def build_survey_responses_html(
         date_id: Field ID for the date field. Defaults to a specific field.
         time_id: Field ID for the time field. Defaults to a specific field.
         media_url_id: Field ID for the media URL field. Defaults to a specific field.
-            
+
     Returns:
         The absolute path to the generated HTML file as a string.
-        
+
     Note:
         - Creates output_dir and output_dir/media directories if they don't exist.
         - Downloads media files with their cleaned filenames (suffix after 'private/').

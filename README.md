@@ -1,0 +1,1 @@
+This is an application mostly written using AI, for a single user.

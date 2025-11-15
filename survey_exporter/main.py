@@ -2,10 +2,60 @@ import pathlib
 import queue as _queue
 from dataclasses import dataclass, field
 from typing import Any, Optional, List, Dict
+import contextvars
+from contextlib import contextmanager
 
 
-@dataclass
+# module-level contextvar to hold an optional output queue
+_out_queue_var: contextvars.ContextVar[Optional[_queue.Queue]] = contextvars.ContextVar(
+    "_out_queue_var", default=None
+)
+
+
+@contextmanager
+def use_out_queue(q: Optional[_queue.Queue]):
+    """
+    Context manager to set the module-level out_queue contextvar for the duration
+    of the context. Usage:
+        with use_out_queue(my_queue):
+            build_survey_responses_html(...)
+    """
+    token = _out_queue_var.set(q)
+    try:
+        yield
+    finally:
+        _out_queue_var.reset(token)
+
+
+# module-level emit helper --- will use the contextvar
+def emit(msg: str) -> None:
+    """
+    Emit a message via the module-level out_queue contextvar if set,
+    otherwise print to stdout.
+    """
+    q = _out_queue_var.get()
+    if q is not None:
+        try:
+            q.put(msg)
+            return
+        except Exception:
+            pass
+    print(msg)
+
+
+@dataclass(frozen=True)
 class Entry:
+    """Represents a single survey response entry.
+
+    Attributes:
+        breaches: List of breach descriptions reported in the survey response.
+        date: Date string associated with the survey response.
+        time: Time string associated with the survey response.
+        media_map: Dictionary mapping cleaned media filenames (suffixes) to their
+            original URLs. The keys are cleaned filenames extracted via media_suffix(),
+            and values are the full original URLs for downloading.
+    """
+
     breaches: list[str]
     date: str
     time: str
@@ -14,9 +64,22 @@ class Entry:
 
 
 def media_suffix(url: str) -> str:
-    """
-    Given a media URL, return the suffix after 'private/' if present,
-    otherwise return the last path segment.
+    """Extract a cleaned filename suffix from a media URL.
+
+    If the URL contains 'private/', returns everything after that segment.
+    Otherwise, returns the last path segment of the URL.
+
+    Args:
+        url: The media URL to extract the suffix from.
+
+    Returns:
+        The cleaned filename suffix extracted from the URL.
+
+    Examples:
+        >>> media_suffix("https://example.com/private/image.jpg")
+        "image.jpg"
+        >>> media_suffix("https://example.com/files/document.pdf")
+        "document.pdf"
     """
     import urllib.parse
 
@@ -30,10 +93,22 @@ def media_suffix(url: str) -> str:
 def http_get_head_or_download(
     url: str, headers: dict, target_path: pathlib.Path
 ) -> bool:
-    """
-    Download the URL to target_path using headers.
-    Only create/write the file if the request succeeds.
-    Returns True on success, False on failure.
+    """Download a file from a URL to a target path with atomic write semantics.
+
+    Creates the target directory if it doesn't exist. Only writes the file if
+    the download succeeds. Cleans up any partially written files on failure.
+
+    Args:
+        url: The URL to download from.
+        headers: Dictionary of HTTP headers to include in the request.
+        target_path: Path where the downloaded file should be saved.
+
+    Returns:
+        True if the download succeeded and the file was written, False otherwise.
+
+    Note:
+        This function implements atomic write semantics - the file is only created
+        if the download completes successfully. Any partial files are removed on error.
     """
     import urllib.request
 
@@ -64,10 +139,29 @@ def get_entries(
     time_id: str,
     media_url_id: str,
 ) -> list[Entry]:
-    """
-    Fetch survey responses from Formbricks API and return list of Entry
-    objects. For each Entry, media_map contains cleaned filename suffixes
-    (via media_suffix) mapped to their original URLs for later downloading.
+    """Fetch survey responses from the Formbricks Management API.
+
+    Retrieves survey responses for the specified survey and field IDs, parsing
+    each response into an Entry object. For each entry, constructs a media_map
+    dictionary mapping cleaned filenames (via media_suffix) to their original URLs.
+
+    Args:
+        api_key: Formbricks API key for authentication (passed in x-api-key header).
+        survey_id: The survey ID to fetch responses from.
+        breaches_id: Field ID for the breaches field in the survey.
+        date_id: Field ID for the date field in the survey.
+        time_id: Field ID for the time field in the survey.
+        media_url_id: Field ID for the media URL field in the survey.
+
+    Returns:
+        List of Entry objects representing the survey responses. Returns an empty
+        list if the response data is invalid or not in the expected format.
+
+    Raises:
+        RuntimeError: If the HTTP request fails or JSON parsing fails, wrapping
+            the underlying exception with a "Failed to fetch entries" message.
+        ValueError: If duplicate media suffixes are detected (two different URLs
+            would map to the same cleaned filename).
     """
     import json
     import urllib.request
@@ -152,25 +246,36 @@ def build_survey_responses_html(
     date_id: str = "h6fzgacr725cmapuwzz9ot5h",
     time_id: str = "o45q50hpyzow5xfgk5dr8ey5",
     media_url_id: str = "qu3bazylkalup4hy24q2pb1n",
-    out_queue: Optional[_queue.Queue] = None,
 ) -> str:
-    """
-    Fetch survey responses from Formbricks Management API and return the path to the generated HTML file.
+    """Build an HTML report of survey responses with downloaded media files.
 
-    Media files found at URLs are downloaded (request made with same x-api-key header)
-    into output_dir/media/ and only the suffix after 'private/' is retained for the HTML output.
+    Fetches survey responses from the Formbricks Management API, downloads all
+    associated media files to a local media subdirectory, and generates an HTML
+    table displaying the responses with links to the downloaded media.
+
+    The function handles errors gracefully by writing minimal error HTML when
+    the API request fails or no data is found.
+
+    Args:
+        api_key: Formbricks API key for authentication.
+        output_dir: Directory where the HTML file and media subdirectory will be created.
+        survey_id: The survey ID to fetch responses from. Defaults to a specific survey.
+        breaches_id: Field ID for the breaches field. Defaults to a specific field.
+        date_id: Field ID for the date field. Defaults to a specific field.
+        time_id: Field ID for the time field. Defaults to a specific field.
+        media_url_id: Field ID for the media URL field. Defaults to a specific field.
+
+    Returns:
+        The absolute path to the generated HTML file as a string.
+
+    Note:
+        - Creates output_dir and output_dir/media directories if they don't exist.
+        - Downloads media files with their cleaned filenames (suffix after 'private/').
+        - Implements path traversal protection by sanitizing media filenames.
+        - Generates survey_responses.html in the output directory.
+        - On API errors, creates a minimal error HTML file and returns its path.
     """
-    import urllib.request
     import urllib.parse
-
-    def emit(msg: str) -> None:
-        if out_queue is not None:
-            try:
-                out_queue.put(msg)
-            except Exception:
-                print(msg)
-        else:
-            print(msg)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     html_path = output_dir / "survey_responses.html"
@@ -211,11 +316,15 @@ def build_survey_responses_html(
             if not safe_suffix or safe_suffix in (".", ".."):
                 emit(f"Skipping invalid media filename: {suffix}")
                 continue
+
             target_path = media_dir / safe_suffix
-            emit(f"Downloading media: {url} -> {target_path}")
+            if target_path.exists():
+                emit(f"Media file already exists, skipping download: {target_path}")
+                continue
+
             emit(f"Downloading media: {url} -> {target_path}")
             if not http_get_head_or_download(url, headers, target_path):
-                emit(f"Warning: Failed to download {url}")
+                emit(f"Warning: Failed to download {url} -> {target_path}")
 
     rows: List[str] = []
     for idx, entry in enumerate(entries, start=1):

@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox, scrolledtext
 import pathlib
 import queue
 import threading
-from survey_exporter.main import build_survey_responses_html
+from survey_exporter.main import build_survey_responses_html, use_out_queue
 
 
 class SurveyExporterGUI:
@@ -79,9 +79,8 @@ class SurveyExporterGUI:
         def export_thread():
             try:
                 # pass the GUI's queue so build_survey_responses_html emits to the console
-                build_survey_responses_html(
-                    api_key, pathlib.Path(output_dir), out_queue=self.output_queue
-                )
+                with use_out_queue(self.output_queue):
+                    build_survey_responses_html(api_key, pathlib.Path(output_dir))
                 self.root.after(
                     0,
                     lambda: messagebox.showinfo(

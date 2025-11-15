@@ -4,13 +4,10 @@ setup(
     name="survey-exporter",
     version="0.1.0",
     packages=find_packages(),
-    install_requires=[
-        "requests>=2.25.0",
-        "urllib3>=1.26.0"
-    ],
+    install_requires=["requests>=2.25.0", "urllib3>=1.26.0"],
     entry_points={
-        'console_scripts': [
-            'survey-gui=survey_exporter.survey_gui:main',
+        "console_scripts": [
+            "survey-gui=survey_exporter.survey_gui:main",
         ],
     },
     author="Kit Choi",

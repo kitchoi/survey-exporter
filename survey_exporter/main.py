@@ -9,7 +9,7 @@ class Entry:
     breaches: list[str]
     date: str
     time: str
-    media: dict[str, bytes]
+    media: list[str]
 
 
 def media_suffix(url: str) -> str:
@@ -85,7 +85,7 @@ def build_survey_responses_html(
                     f.write(resp.read())
         except Exception as e:
             emit(f"Error downloading media {url}: {e}")
-            # Clean up empty file if it was created
+            # Clean up any partially created file
             target_path.unlink(missing_ok=True)
             return
 
@@ -141,10 +141,11 @@ def build_survey_responses_html(
                 breaches=breaches_val if isinstance(breaches_val, list) else [],
                 date=date_str,
                 time=time_str,
-                media={
-                    media_suffix(url): http_get_head_or_download(url, headers)
+                media=[
+                    media_suffix(url)
                     for url in media_val
-                },
+                    if (http_get_head_or_download(url, headers) or True)
+                ],
             )
         )
 

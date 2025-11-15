@@ -83,7 +83,6 @@ class SurveyExporterGUI:
                     "Survey exported successfully!\n"
                     f"Check {output_dir} for the results."))
             except Exception as e:
-                raise
                 self.root.after(0, lambda: messagebox.showerror(
                     "Error", f"Failed to export survey:\n{str(e)}"))
 
@@ -92,7 +91,7 @@ class SurveyExporterGUI:
 
 def main():
     root = tk.Tk()
-    app = SurveyExporterGUI(root)
+    SurveyExporterGUI(root)
     root.mainloop()
 
 if __name__ == "__main__":

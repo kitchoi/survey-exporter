@@ -52,7 +52,7 @@ def build_survey_responses_html(
     import json
     import urllib.request
     import urllib.parse
-    from typing import Any, Optional, List
+    from typing import Optional
 
     def emit(msg: str) -> None:
         if out_queue is not None:
@@ -65,7 +65,7 @@ def build_survey_responses_html(
             print(msg)
 
     def http_get_json(url: str, headers: dict) -> Any:
-        req = urllib.request.Request(url, headers=headers, method="GET")
+        req = urllib.request.Request(url, headers={**headers, "Accept": "application/json"}, method="GET")
         with urllib.request.urlopen(req) as resp:
             return json.load(resp)
 
@@ -76,15 +76,17 @@ def build_survey_responses_html(
         if target_path.exists():
             return
         emit(f"Downloading media: {url}")
-        with open(target_path, "wb") as f:
-            try:
-                req = urllib.request.Request(url, headers=headers, method="GET")
-                with urllib.request.urlopen(req) as resp:
-                    while (chunk := resp.read(8192)):
-                        f.write(chunk)
-            except Exception as e:
-                emit(f"Warning: failed to download {url}: {e}")
-
+        try:
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            with urllib.request.urlopen(req) as resp:
+                with open(target_path, "wb") as f:
+                    f.write(resp.read())
+        except Exception as e:
+            emit(f"Error downloading media {url}: {e}")
+            # Clean up empty file if it was created
+            if target_path.exists():
+                target_path.unlink()
+            return
 
     def get_value(obj: Any, target: str) -> Optional[Any]:
         """
@@ -93,7 +95,7 @@ def build_survey_responses_html(
         """
         return obj["data"][target] if isinstance(obj, dict) and "data" in obj and target in obj["data"] else None
 
-    headers = {"x-api-key": api_key, "Accept": "application/json"}
+    headers = {"x-api-key": api_key}
     base_url = f"https://app.formbricks.com/api/v1/management/responses?surveyId={urllib.parse.quote(survey_id)}"
 
     # fetch responses
@@ -173,5 +175,13 @@ def build_survey_responses_html(
 
 
 if __name__ == "__main__":
+    import os
     import sys
-    build_survey_responses_html(sys.argv[1], pathlib.Path(sys.argv[2]))
+
+    api_key = os.environ.get("SURVEY_API_KEY")
+    if not api_key:
+        print("Environment variable SURVEY_API_KEY not set", file=sys.stderr)
+        sys.exit(2)
+
+    out_dir = pathlib.Path.cwd() / "output"
+    build_survey_responses_html(api_key, out_dir)

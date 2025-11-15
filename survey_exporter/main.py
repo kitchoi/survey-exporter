@@ -2,6 +2,45 @@ import pathlib
 import queue as _queue
 from dataclasses import dataclass, field
 from typing import Any, Optional, List, Dict
+import contextvars
+from contextlib import contextmanager
+
+
+# module-level contextvar to hold an optional output queue
+_out_queue_var: contextvars.ContextVar[Optional[_queue.Queue]] = contextvars.ContextVar(
+    "_out_queue_var", default=None
+)
+
+
+@contextmanager
+def use_out_queue(q: Optional[_queue.Queue]):
+    """
+    Context manager to set the module-level out_queue contextvar for the duration
+    of the context. Usage:
+        with use_out_queue(my_queue):
+            build_survey_responses_html(...)
+    """
+    token = _out_queue_var.set(q)
+    try:
+        yield
+    finally:
+        _out_queue_var.reset(token)
+
+
+# module-level emit helper --- will use the contextvar
+def emit(msg: str) -> None:
+    """
+    Emit a message via the module-level out_queue contextvar if set,
+    otherwise print to stdout.
+    """
+    q = _out_queue_var.get()
+    if q is not None:
+        try:
+            q.put(msg)
+            return
+        except Exception:
+            pass
+    print(msg)
 
 
 @dataclass
@@ -152,7 +191,6 @@ def build_survey_responses_html(
     date_id: str = "h6fzgacr725cmapuwzz9ot5h",
     time_id: str = "o45q50hpyzow5xfgk5dr8ey5",
     media_url_id: str = "qu3bazylkalup4hy24q2pb1n",
-    out_queue: Optional[_queue.Queue] = None,
 ) -> str:
     """
     Fetch survey responses from Formbricks Management API and return the path to the generated HTML file.
@@ -162,15 +200,6 @@ def build_survey_responses_html(
     """
     import urllib.request
     import urllib.parse
-
-    def emit(msg: str) -> None:
-        if out_queue is not None:
-            try:
-                out_queue.put(msg)
-            except Exception:
-                print(msg)
-        else:
-            print(msg)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     html_path = output_dir / "survey_responses.html"
@@ -211,11 +240,15 @@ def build_survey_responses_html(
             if not safe_suffix or safe_suffix in (".", ".."):
                 emit(f"Skipping invalid media filename: {suffix}")
                 continue
+
             target_path = media_dir / safe_suffix
-            emit(f"Downloading media: {url} -> {target_path}")
+            if target_path.exists():
+                emit(f"Media file already exists, skipping download: {target_path}")
+                continue
+
             emit(f"Downloading media: {url} -> {target_path}")
             if not http_get_head_or_download(url, headers, target_path):
-                emit(f"Warning: Failed to download {url}")
+                emit(f"Warning: Failed to download {url} -> {target_path}")
 
     rows: List[str] = []
     for idx, entry in enumerate(entries, start=1):

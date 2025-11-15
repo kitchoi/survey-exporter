@@ -180,6 +180,7 @@ def test_get_entries_handles_missing_fields():
         assert entry.time == ""
         # no media -> empty mapping
         assert entry.media_map == {}
+        assert entry.comment == ""
 
 
 def test_get_entries_handles_single_media_url():

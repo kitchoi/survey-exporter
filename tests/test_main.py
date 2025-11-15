@@ -2,7 +2,6 @@ import pathlib
 import pytest
 from unittest.mock import patch, MagicMock
 from survey_exporter.main import (
-    Entry,
     build_survey_responses_html,
     get_entries,
     http_get_head_or_download,
@@ -23,6 +22,7 @@ def mock_api_response():
                         "https://example.com/private/file1.pdf",
                         "https://example.com/private/file2.jpg",
                     ],
+                    "comment_202": "This is a comment.",
                 }
             },
             {
@@ -31,35 +31,11 @@ def mock_api_response():
                     "date_456": "2025-11-14",
                     "time_789": "10:15",
                     "media_101": ["https://example.com/uploads/document.png"],
+                    "comment_202": "This is another comment.",
                 }
             },
         ]
     }
-
-
-def test_get_entries_returns_list_of_entries(mock_api_response):
-    """Test that get_entries returns a list of Entry objects."""
-    with patch("urllib.request.urlopen") as mock_urlopen:
-        mock_response = MagicMock()
-        mock_response.__enter__.return_value.read.return_value = json.dumps(
-            mock_api_response
-        ).encode()
-        mock_urlopen.return_value = mock_response
-
-        entries = get_entries(
-            api_key="test_key",
-            survey_id="survey_123",
-            breaches_id="breach_123",
-            date_id="date_456",
-            time_id="time_789",
-            media_url_id="media_101",
-        )
-
-        assert isinstance(entries, list)
-        assert len(entries) == 2
-        assert all(isinstance(entry, Entry) for entry in entries)
-        # media_map should be present on entries (may be empty dict)
-        assert isinstance(entries[0].media_map, dict)
 
 
 def test_get_entries_populates_entry_fields(mock_api_response):
@@ -78,6 +54,7 @@ def test_get_entries_populates_entry_fields(mock_api_response):
             date_id="date_456",
             time_id="time_789",
             media_url_id="media_101",
+            comment_id="comment_202",
         )
 
         entry = entries[0]
@@ -89,6 +66,7 @@ def test_get_entries_populates_entry_fields(mock_api_response):
         assert entry.media_map["file1.pdf"] == "https://example.com/private/file1.pdf"
         assert "file2.jpg" in entry.media_map
         assert entry.media_map["file2.jpg"] == "https://example.com/private/file2.jpg"
+        assert entry.comment == "This is a comment."
         # second entry media_map contains document.png
         assert "document.png" in entries[1].media_map
         assert (
@@ -107,6 +85,7 @@ def test_get_entries_cleans_media_urls_with_private_suffix():
                     "date_456": "2025-11-15",
                     "time_789": "14:30",
                     "media_101": ["https://example.com/private/cleaned_file.pdf"],
+                    "comment_202": "",
                 }
             }
         ]
@@ -125,6 +104,7 @@ def test_get_entries_cleans_media_urls_with_private_suffix():
             date_id="date_456",
             time_id="time_789",
             media_url_id="media_101",
+            comment_id="comment_202",
         )
 
         assert "cleaned_file.pdf" in entries[0].media_map
@@ -144,6 +124,7 @@ def test_get_entries_cleans_media_urls_without_private_suffix():
                     "date_456": "2025-11-15",
                     "time_789": "14:30",
                     "media_101": ["https://example.com/uploads/document.png"],
+                    "comment_202": "",
                 }
             }
         ]
@@ -162,6 +143,7 @@ def test_get_entries_cleans_media_urls_without_private_suffix():
             date_id="date_456",
             time_id="time_789",
             media_url_id="media_101",
+            comment_id="comment_202",
         )
 
         assert "document.png" in entries[0].media_map
@@ -189,6 +171,7 @@ def test_get_entries_handles_missing_fields():
             date_id="date_456",
             time_id="time_789",
             media_url_id="media_101",
+            comment_id="comment_202",
         )
 
         entry = entries[0]
@@ -197,6 +180,7 @@ def test_get_entries_handles_missing_fields():
         assert entry.time == ""
         # no media -> empty mapping
         assert entry.media_map == {}
+        assert entry.comment == ""
 
 
 def test_get_entries_handles_single_media_url():
@@ -209,6 +193,7 @@ def test_get_entries_handles_single_media_url():
                     "date_456": "2025-11-15",
                     "time_789": "14:30",
                     "media_101": "https://example.com/private/single_file.pdf",
+                    "comment_202": "",
                 }
             }
         ]
@@ -227,6 +212,7 @@ def test_get_entries_handles_single_media_url():
             date_id="date_456",
             time_id="time_789",
             media_url_id="media_101",
+            comment_id="comment_202",
         )
 
         assert "single_file.pdf" in entries[0].media_map
@@ -254,6 +240,7 @@ def test_get_entries_returns_empty_list_on_invalid_response():
             date_id="date_456",
             time_id="time_789",
             media_url_id="media_101",
+            comment_id="comment_202",
         )
 
         assert entries == []
@@ -272,6 +259,7 @@ def test_get_entries_raises_on_http_error():
                 date_id="date_456",
                 time_id="time_789",
                 media_url_id="media_101",
+                comment_id="comment_202",
             )
 
         assert "Failed to fetch entries" in str(excinfo.value)
@@ -310,6 +298,7 @@ def test_get_entries_raises_on_duplicate_media_suffix():
                 date_id="date_456",
                 time_id="time_789",
                 media_url_id="media_101",
+                comment_id="comment_202",
             )
 
         error_msg = str(excinfo.value)
@@ -340,6 +329,7 @@ def test_build_survey_responses_html_downloads_media(tmp_path):
                         "https://example.com/private/file1.jpg",
                         "https://example.com/uploads/doc.pdf",
                     ],
+                    "comment_202": "",
                 }
             }
         ]
@@ -371,6 +361,7 @@ def test_build_survey_responses_html_downloads_media(tmp_path):
             date_id="date_456",
             time_id="time_789",
             media_url_id="media_101",
+            comment_id="comment_202",
         )
 
         # expect two downloads + one json fetch -> 3 calls

@@ -61,6 +61,7 @@ class Entry:
     time: str
     # mapping from cleaned suffix -> original URL
     media_map: dict[str, str] = field(default_factory=dict)
+    comment: str = ""
 
 
 def media_suffix(url: str) -> str:
@@ -138,6 +139,7 @@ def get_entries(
     date_id: str,
     time_id: str,
     media_url_id: str,
+    comment_id: str,
 ) -> list[Entry]:
     """Fetch survey responses from the Formbricks Management API.
 
@@ -152,6 +154,7 @@ def get_entries(
         date_id: Field ID for the date field in the survey.
         time_id: Field ID for the time field in the survey.
         media_url_id: Field ID for the media URL field in the survey.
+        comment_id: Field ID for the comment field in the survey.
 
     Returns:
         List of Entry objects representing the survey responses. Returns an empty
@@ -201,6 +204,7 @@ def get_entries(
         date_val = get_value(item, date_id)
         time_val = get_value(item, time_id)
         media_val = get_value(item, media_url_id)
+        comment_val = get_value(item, comment_id)
 
         media_val = (
             media_val
@@ -209,9 +213,6 @@ def get_entries(
             if isinstance(media_val, str)
             else []
         )
-
-        date_str = "" if date_val is None else str(date_val)
-        time_str = "" if time_val is None else str(time_val)
 
         # Clean media URLs using media_suffix and build suffix -> URL map
         media_map: Dict[str, str] = {}
@@ -229,9 +230,10 @@ def get_entries(
         # create Entry without media attributes, attach media_map dynamically
         entry = Entry(
             breaches=breaches_val if isinstance(breaches_val, list) else [],
-            date=date_str,
-            time=time_str,
+            date=("" if date_val is None else str(date_val)),
+            time=("" if time_val is None else str(time_val)),
             media_map=media_map,
+            comment=("" if comment_val is None else str(comment_val)),
         )
         entries.append(entry)
 
@@ -246,6 +248,7 @@ def build_survey_responses_html(
     date_id: str = "h6fzgacr725cmapuwzz9ot5h",
     time_id: str = "o45q50hpyzow5xfgk5dr8ey5",
     media_url_id: str = "qu3bazylkalup4hy24q2pb1n",
+    comment_id: str = "r8ett4f19jnt3sthnotme678",
 ) -> str:
     """Build an HTML report of survey responses with downloaded media files.
 
@@ -264,6 +267,7 @@ def build_survey_responses_html(
         date_id: Field ID for the date field. Defaults to a specific field.
         time_id: Field ID for the time field. Defaults to a specific field.
         media_url_id: Field ID for the media URL field. Defaults to a specific field.
+        comment_id: Field ID for the comment field in the survey.
 
     Returns:
         The absolute path to the generated HTML file as a string.
@@ -289,6 +293,7 @@ def build_survey_responses_html(
             date_id=date_id,
             time_id=time_id,
             media_url_id=media_url_id,
+            comment_id=comment_id,
         )
     except RuntimeError as e:
         emit(str(e))
@@ -351,6 +356,7 @@ def build_survey_responses_html(
             f"<td>{breaches_str}</td>"
             f"<td>{esc(entry.date)}</td>"
             f"<td>{esc(entry.time)}</td>"
+            f"<td>{esc(entry.comment)}</td>"
             f"<td>{media_str}</td>"
             "</tr>"
         )
@@ -358,7 +364,7 @@ def build_survey_responses_html(
 
     table_html = (
         "<table border='1'>"
-        "<thead><tr><th>Breaches</th><th>Date</th><th>Time</th><th>Media</th></tr></thead>"
+        "<thead><tr><th>Breaches</th><th>Date</th><th>Time</th><th>Comment</th><th>Media</th></tr></thead>"
         "<tbody>" + "".join(rows) + "</tbody></table>"
     )
     full_html = f"<!doctype html><html><head><meta charset='utf-8'><title>Survey Responses</title></head><body>{table_html}</body></html>"

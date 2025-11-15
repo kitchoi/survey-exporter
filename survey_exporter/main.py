@@ -206,7 +206,12 @@ def build_survey_responses_html(
         if not entry.media_map:
             continue
         for suffix, url in entry.media_map.items():
-            target_path = media_dir / pathlib.Path(suffix)
+            # Sanitize suffix to prevent path traversal
+            safe_suffix = pathlib.Path(suffix).name  # Extract only the filename
+            if not safe_suffix or safe_suffix in (".", ".."):
+                emit(f"Skipping invalid media filename: {suffix}")
+                continue
+            target_path = media_dir / safe_suffix
             emit(f"Downloading media: {url} -> {target_path}")
             http_get_head_or_download(url, headers, target_path)
 

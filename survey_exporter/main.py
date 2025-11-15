@@ -84,8 +84,7 @@ def build_survey_responses_html(
         except Exception as e:
             emit(f"Error downloading media {url}: {e}")
             # Clean up empty file if it was created
-            if target_path.exists():
-                target_path.unlink()
+            target_path.unlink(missing_ok=True)
             return
 
     def get_value(obj: Any, target: str) -> Optional[Any]:

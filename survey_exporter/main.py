@@ -65,9 +65,9 @@ def get_entries(
     media_url_id: str,
 ) -> list[Entry]:
     """
-    Fetch survey responses from Formbricks API and return list of Entry objects.
-    Media is returned as a list of cleaned suffixes (using media_suffix) and
-    media_map (suffix -> original url) is attached to the Entry for downloading.
+    Fetch survey responses from Formbricks API and return list of Entry
+    objects. For each Entry, media_map contains cleaned filename suffixes
+    (via media_suffix) mapped to their original URLs for later downloading.
     """
     import json
     import urllib.request

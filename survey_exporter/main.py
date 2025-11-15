@@ -204,6 +204,7 @@ def get_entries(
         date_val = get_value(item, date_id)
         time_val = get_value(item, time_id)
         media_val = get_value(item, media_url_id)
+        comment_val = get_value(item, comment_id)
 
         media_val = (
             media_val
@@ -212,9 +213,6 @@ def get_entries(
             if isinstance(media_val, str)
             else []
         )
-
-        date_str = "" if date_val is None else str(date_val)
-        time_str = "" if time_val is None else str(time_val)
 
         # Clean media URLs using media_suffix and build suffix -> URL map
         media_map: Dict[str, str] = {}
@@ -232,10 +230,10 @@ def get_entries(
         # create Entry without media attributes, attach media_map dynamically
         entry = Entry(
             breaches=breaches_val if isinstance(breaches_val, list) else [],
-            date=date_str,
-            time=time_str,
+            date=("" if date_val is None else str(date_val)),
+            time=("" if time_val is None else str(time_val)),
             media_map=media_map,
-            comment=get_value(item, comment_id) or "",
+            comment=("" if comment_val is None else str(comment_val)),
         )
         entries.append(entry)
 
@@ -269,6 +267,7 @@ def build_survey_responses_html(
         date_id: Field ID for the date field. Defaults to a specific field.
         time_id: Field ID for the time field. Defaults to a specific field.
         media_url_id: Field ID for the media URL field. Defaults to a specific field.
+        comment_id: Field ID for the comment field in the survey.
 
     Returns:
         The absolute path to the generated HTML file as a string.

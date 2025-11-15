@@ -40,7 +40,7 @@ def http_get_head_or_download(
     target_path.parent.mkdir(parents=True, exist_ok=True)
     req = urllib.request.Request(url, headers=headers, method="GET")
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read()
             # write only if we got data (and no exception)
             with open(target_path, "wb") as f:

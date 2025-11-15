@@ -213,7 +213,9 @@ def build_survey_responses_html(
                 continue
             target_path = media_dir / safe_suffix
             emit(f"Downloading media: {url} -> {target_path}")
-            http_get_head_or_download(url, headers, target_path)
+            emit(f"Downloading media: {url} -> {target_path}")
+            if not http_get_head_or_download(url, headers, target_path):
+                emit(f"Warning: Failed to download {url}")
 
     rows: List[str] = []
     for idx, entry in enumerate(entries, start=1):

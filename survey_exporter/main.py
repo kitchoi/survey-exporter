@@ -65,7 +65,9 @@ def build_survey_responses_html(
             print(msg)
 
     def http_get_json(url: str, headers: dict) -> Any:
-        req = urllib.request.Request(url, headers={**headers, "Accept": "application/json"}, method="GET")
+        req = urllib.request.Request(
+            url, headers={**headers, "Accept": "application/json"}, method="GET"
+        )
         with urllib.request.urlopen(req) as resp:
             return json.load(resp)
 
@@ -92,7 +94,11 @@ def build_survey_responses_html(
         Recursively search for a key in nested dict/list structures.
         Returns the first matching value found or None.
         """
-        return obj["data"][target] if isinstance(obj, dict) and "data" in obj and target in obj["data"] else None
+        return (
+            obj["data"][target]
+            if isinstance(obj, dict) and "data" in obj and target in obj["data"]
+            else None
+        )
 
     headers = {"x-api-key": api_key}
     base_url = f"https://app.formbricks.com/api/v1/management/responses?surveyId={urllib.parse.quote(survey_id)}"
@@ -120,18 +126,28 @@ def build_survey_responses_html(
         date_val = get_value(item, date_id)
         time_val = get_value(item, time_id)
         media_val = get_value(item, media_url_id)
-        media_val = media_val if isinstance(media_val, list) else [media_val] if isinstance(media_val, str) else []
+        media_val = (
+            media_val
+            if isinstance(media_val, list)
+            else [media_val]
+            if isinstance(media_val, str)
+            else []
+        )
 
         date_str = "" if date_val is None else str(date_val)
         time_str = "" if time_val is None else str(time_val)
         entries.append(
-            Entry(breaches=breaches_val if isinstance(breaches_val, list) else [],
-                  date=date_str,
-                  time=time_str,
-                  media={media_suffix(url): http_get_head_or_download(url, headers) for url in media_val},
+            Entry(
+                breaches=breaches_val if isinstance(breaches_val, list) else [],
+                date=date_str,
+                time=time_str,
+                media={
+                    media_suffix(url): http_get_head_or_download(url, headers)
+                    for url in media_val
+                },
             )
         )
-    
+
     for entry in sorted(entries, key=lambda e: (e.date, e.time), reverse=True):
         # escape minimal HTML special chars
         def esc(s: str) -> str:
@@ -142,7 +158,7 @@ def build_survey_responses_html(
                 .replace('"', "&quot;")
                 .replace("'", "&#39;")
             )
-        
+
         def to_link(s: str) -> str:
             return f'<a href="media/{s}">{urllib.parse.unquote(s)}</a>'
 
@@ -161,12 +177,10 @@ def build_survey_responses_html(
     table_html = (
         "<table border='1'>"
         "<thead><tr><th>Breaches</th><th>Date</th><th>Time</th><th>Media</th></tr></thead>"
-        "<tbody>"
-        + "".join(rows)
-        + "</tbody></table>"
+        "<tbody>" + "".join(rows) + "</tbody></table>"
     )
     full_html = f"<!doctype html><html><head><meta charset='utf-8'><title>Survey Responses</title></head><body>{table_html}</body></html>"
-    
+
     output_dir.mkdir(parents=True, exist_ok=True)
     with open(output_dir / "survey_responses.html", "w", encoding="utf-8") as f:
         f.write(full_html)

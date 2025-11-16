@@ -227,7 +227,6 @@ def get_entries(
                 )
             media_map[suffix] = url
 
-        # create Entry without media attributes, attach media_map dynamically
         entry = Entry(
             breaches=breaches_val if isinstance(breaches_val, list) else [],
             date=("" if date_val is None else str(date_val)),
@@ -322,7 +321,7 @@ def build_survey_responses_html(
                 emit(f"Skipping invalid media filename: {suffix}")
                 continue
 
-            target_path = media_dir / safe_suffix
+            target_path = media_dir / urllib.parse.unquote(safe_suffix)
             if target_path.exists():
                 emit(f"Media file already exists, skipping download: {target_path}")
                 continue

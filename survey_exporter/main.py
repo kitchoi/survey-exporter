@@ -27,7 +27,6 @@ def use_out_queue(q: Optional[_queue.Queue]):
         _out_queue_var.reset(token)
 
 
-# module-level emit helper --- will use the contextvar
 def emit(msg: str) -> None:
     """
     Emit a message via the module-level out_queue contextvar if set,

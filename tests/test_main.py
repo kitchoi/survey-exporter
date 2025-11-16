@@ -327,7 +327,7 @@ def test_build_survey_responses_html_downloads_media(tmp_path):
                     "time_789": "14:30",
                     "media_101": [
                         "https://example.com/private/file1.jpg",
-                        "https://example.com/uploads/doc.pdf",
+                        "https://example.com/uploads/doc%202.pdf",
                     ],
                     "comment_202": "",
                 }
@@ -369,7 +369,7 @@ def test_build_survey_responses_html_downloads_media(tmp_path):
 
         media_dir = pathlib.Path(tmp_path) / "media"
         file1_path = media_dir / "file1.jpg"
-        file2_path = media_dir / "doc.pdf"
+        file2_path = media_dir / "doc 2.pdf"
 
         assert file1_path.exists()
         assert file1_path.read_bytes() == b"file1-binary"
@@ -381,7 +381,7 @@ def test_build_survey_responses_html_downloads_media(tmp_path):
         assert html_path.exists()
         html_text = html_path.read_text(encoding="utf-8")
         assert "file1.jpg" in html_text
-        assert "doc.pdf" in html_text
+        assert "doc%202.pdf" in html_text
 
 
 def test_http_get_head_or_download_cleans_up_on_failure(tmp_path):
